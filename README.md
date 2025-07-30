@@ -19,6 +19,14 @@
 - 🌓 **Dark Mode** – Optional night-friendly reading mode
 - 🌌 **Starry Animated Background** – Clean and tranquil UI design
 
+  ## 💻 Compatibility
+
+**Digital Quran** is fully responsive and works across all modern devices:
+
+- 🖥️ Desktop and Laptop (PC/Mac/Linux)
+- 📱 Smartphones
+- 📱 Tablets
+
 ## 💡 Tech Stack
 
 - **Frontend**: HTML, CSS, JavaScript
