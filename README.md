@@ -1,4 +1,4 @@
-# 🌙 Digital Quran
+# 🌙 Digital Quran / Project in progress .
 
 **Digital Quran** is a beautifully designed web app for reading the Quran with translation, audio, and bookmarks — all in a calm, interactive interface.
 
@@ -23,3 +23,15 @@
 Simply open `index.html` in your browser — no setup needed!
 
 ---
+## 🌱 Future Plans
+
+This project is just the beginning. I plan to continue improving it with features that benefit me and my brothers and sisters in shaa Allah.
+
+Planned additions include:
+
+- 🎨 Improved and more responsive UI/UX
+- 🕰️ Daily **Prayer Times** based on location
+- 🧎‍♂️ Dhikr .
+- 📚 Save personal reading history and progress
+- 🤲 Daily Ayah reminders or reflections
+......
