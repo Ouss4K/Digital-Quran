@@ -9,8 +9,7 @@
 [![Badges](https://img.shields.io/github/stars/ouss4k/Digital-Quran?style=social)]()
 [![Badges](https://img.shields.io/github/languages/code-size/ouss4k/Digital-Quran?label=Code%20Size&style=social)]()
 [![Badges](https://img.shields.io/github/directory-file-count/ouss4k/Digital-Quran?label=All%20Files&style=social)]()
-[![Badges](https://img.shields.io/github/package-json/v/ouss4k/Digital-Quran?label=package.json%20v.&style=social)]()
-[![Badges](https://img.shields.io/npm/l/react?style=social)]()
+
 
 
 
