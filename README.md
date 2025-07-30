@@ -4,8 +4,6 @@
 
 
 
-<img width="2537" height="730" alt="image" src="https://github.com/user-attachments/assets/f32573b1-c287-430b-9b51-1c164c09fde8" />
-
 
 [![Build](https://img.shields.io/github/followers/ouss4k?label=Follow%20Me&style=social)](https://github.com/login?return_to=https%3A%2F%2Fgithub.com%2Fouss4k)
 [![Badges](https://img.shields.io/github/stars/ouss4k/al-quran?style=social)]()
@@ -13,6 +11,15 @@
 [![Badges](https://img.shields.io/github/directory-file-count/ouss4k/al-quran?label=All%20Files&style=social)]()
 [![Badges](https://img.shields.io/github/package-json/v/ouss4k/al-quran?label=package.json%20v.&style=social)]()
 [![Badges](https://img.shields.io/npm/l/react?style=social)]()
+
+
+
+
+
+<img width="2537" height="730" alt="image" src="https://github.com/user-attachments/assets/f32573b1-c287-430b-9b51-1c164c09fde8" />
+
+
+
 
 
 ## ✨ Features
