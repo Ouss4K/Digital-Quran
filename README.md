@@ -54,4 +54,4 @@ Planned additions include:
 Reporte issue :
 
 
-📢[Report issue]([[(https://github.com/ouss4k/Digital-Quran/issues/new)])
+📢[Report issue](https://github.com/ouss4k/Digital-Quran/issues/new)
