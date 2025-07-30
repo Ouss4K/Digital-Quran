@@ -35,6 +35,7 @@
 ## 📁 How to Run
 
 Simply open `index.html` in your browser — no setup needed!
+Or host it on your own web server.
 
 ---
 ## 🌱 Future Plans
