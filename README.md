@@ -50,3 +50,8 @@ Planned additions include:
 - 📚 Save personal reading history and progress
 - 🤲 Daily Ayah reminders or reflections
 ......
+  
+Reporte issue :
+
+
+📢[Report issue]([[(https://github.com/ouss4k/Digital-Quran/issues/new)])
