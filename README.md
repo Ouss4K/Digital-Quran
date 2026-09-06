@@ -2,7 +2,7 @@
 
 A calm, modern Quran companion for reading, listening, bookmarking, prayer times, and dhikr — all in the browser.
 
-**Live:** [ouss4k.github.io/Digital-Quran](https://ouss4k.github.io/Digital-Quran/)
+**Live:** [ouss4k.github.io/Digital-Quran](https://github.com/Ouss4K/Digital-Quran)
 
 ## Features
 
