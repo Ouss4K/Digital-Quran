@@ -448,7 +448,6 @@
                 surahNumber: arabicSurah.number,
                 surahName: arabicSurah.englishName
             });
-            if (arabicSurah.number === 1 && ayah.numberInSurah === 1) return "";
             const marked = isBookmarked(ayah.number);
             return `
                 <article class="verse-container${marked ? " bookmarked" : ""}" id="verse-${ayah.number}" data-verse="${ayah.numberInSurah}" data-ayah="${ayah.number}">
@@ -469,14 +468,10 @@
             `;
         }).join("");
 
-        const bismillah = arabicSurah.number !== 9 ? `
+        const bismillah = arabicSurah.number !== 1 && arabicSurah.number !== 9 ? `
             <div class="bismillah">
                 <div class="bismillah-arabic" lang="ar" dir="rtl">${BISMILLAH_ARABIC}</div>
                 <div class="bismillah-translation">In the name of Allah, the Most Gracious, the Most Merciful</div>
-                ${arabicSurah.number === 1 ? `
-                    <button class="verse-action-btn" type="button" data-action="tafsir" data-verse-key="1:1" aria-expanded="false">Tafsir</button>
-                    <div class="tafsir-panel" data-tafsir-panel="1:1" hidden></div>
-                ` : ""}
             </div>
         ` : "";
 
