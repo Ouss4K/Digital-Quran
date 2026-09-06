@@ -5,6 +5,14 @@
     const AUDIO_SURAH = "https://cdn.islamic.network/quran/audio-surah/128/ar.alafasy";
     const AUDIO_AYAH = "https://cdn.islamic.network/quran/audio/128/ar.alafasy";
     const ALADHAN = "https://api.aladhan.com/v1";
+    const TAFSIR_API = "https://api.quran.com/api/v4";
+
+    const TAFSIRS = {
+        169: { name: "Ibn Kathir (English, abridged)", rtl: false },
+        168: { name: "Ma'arif al-Qur'an (English)", rtl: false },
+        16: { name: "Al-Muyassar (Arabic)", rtl: true },
+        91: { name: "Al-Sa'di (Arabic)", rtl: true }
+    };
 
     const LANGUAGES = {
         "en.sahih": { name: "English (Sahih International)", short: "English" },
@@ -67,6 +75,8 @@
         verseObserver: null,
         lastRead: loadJson("quranLastRead", null),
         fontScale: Number(localStorage.getItem("quranFontScale") || 1),
+        tafsirId: Number(localStorage.getItem("quranTafsir") || 169),
+        tafsirCache: new Map(),
         prayer: loadJson("quranPrayerPrefs", { method: "3", city: "", country: "", lat: null, lng: null }),
         dhikr: loadDhikr(),
         dailyAyah: null
@@ -449,10 +459,12 @@
                             <button class="verse-action-btn" type="button" data-action="copy" data-ayah="${ayah.number}" aria-label="Copy verse">Copy</button>
                             <button class="verse-action-btn" type="button" data-action="share" data-ayah="${ayah.number}" aria-label="Share verse">Share</button>
                             <button class="verse-action-btn${marked ? " bookmarked" : ""}" type="button" data-action="bookmark" data-ayah="${ayah.number}" aria-label="Bookmark verse">${marked ? "Saved" : "Save"}</button>
+                            <button class="verse-action-btn" type="button" data-action="tafsir" data-verse-key="${arabicSurah.number}:${ayah.numberInSurah}" aria-expanded="false">Tafsir</button>
                         </div>
                     </div>
                     <div class="arabic-verse" lang="ar" dir="rtl">${escapeHtml(arabic)}</div>
                     <div class="verse-translation">${escapeHtml(translation)}</div>
+                    <div class="tafsir-panel" data-tafsir-panel="${arabicSurah.number}:${ayah.numberInSurah}" hidden></div>
                 </article>
             `;
         }).join("");
@@ -461,6 +473,10 @@
             <div class="bismillah">
                 <div class="bismillah-arabic" lang="ar" dir="rtl">${BISMILLAH_ARABIC}</div>
                 <div class="bismillah-translation">In the name of Allah, the Most Gracious, the Most Merciful</div>
+                ${arabicSurah.number === 1 ? `
+                    <button class="verse-action-btn" type="button" data-action="tafsir" data-verse-key="1:1" aria-expanded="false">Tafsir</button>
+                    <div class="tafsir-panel" data-tafsir-panel="1:1" hidden></div>
+                ` : ""}
             </div>
         ` : "";
 
@@ -472,6 +488,8 @@
                     <button class="btn secondary" type="button" data-action="next-surah" ${nextDisabled}>Next</button>
                 </div>
                 <div class="toolbar-group">
+                    <label class="visually-hidden" for="tafsirSelect">Tafsir source</label>
+                    <select class="language-selector" id="tafsirSelect" data-action="tafsir-source">${tafsirOptions()}</select>
                     <button class="btn secondary" type="button" data-action="font-down" aria-label="Decrease text size">A−</button>
                     <button class="btn secondary" type="button" data-action="font-up" aria-label="Increase text size">A+</button>
                 </div>
@@ -508,6 +526,99 @@
                     setTimeout(() => target.classList.remove("highlight"), 1800);
                 }
             });
+        }
+    }
+
+    function tafsirOptions() {
+        if (!TAFSIRS[state.tafsirId]) state.tafsirId = 169;
+        return Object.entries(TAFSIRS).map(([id, tafsir]) =>
+            `<option value="${id}" ${Number(id) === Number(state.tafsirId) ? "selected" : ""}>${escapeHtml(tafsir.name)}</option>`
+        ).join("");
+    }
+
+    function tafsirPlainText(raw) {
+        const parsed = new DOMParser().parseFromString(String(raw || ""), "text/html");
+        return (parsed.body.textContent || "").replace(/\u00a0/g, " ").replace(/\s+\n/g, "\n").trim();
+    }
+
+    function renderTafsirPanel(panel, { loading, error, text, source }) {
+        panel.replaceChildren();
+        if (loading) {
+            const status = document.createElement("p");
+            status.className = "tafsir-status";
+            status.textContent = "Loading tafsir…";
+            panel.appendChild(status);
+            return;
+        }
+        if (error) {
+            const status = document.createElement("p");
+            status.className = "tafsir-status";
+            status.textContent = error;
+            panel.appendChild(status);
+            return;
+        }
+        const meta = document.createElement("p");
+        meta.className = "tafsir-source";
+        meta.textContent = `${source}. Scholarly commentary — not a substitute for the Quran.`;
+        panel.appendChild(meta);
+        const body = document.createElement("div");
+        body.className = "tafsir-body";
+        const sourceInfo = TAFSIRS[state.tafsirId];
+        if (sourceInfo?.rtl) {
+            body.lang = "ar";
+            body.dir = "rtl";
+        }
+        text.split(/\n{2,}/).forEach((paragraph) => {
+            const p = document.createElement("p");
+            p.textContent = paragraph.trim();
+            if (p.textContent) body.appendChild(p);
+        });
+        if (!body.childElementCount) {
+            const p = document.createElement("p");
+            p.textContent = text;
+            body.appendChild(p);
+        }
+        panel.appendChild(body);
+    }
+
+    async function toggleTafsir(verseKey, button) {
+        const panel = document.querySelector(`[data-tafsir-panel="${verseKey}"]`);
+        if (!panel || !verseKey) return;
+
+        const opening = panel.hidden;
+        document.querySelectorAll(".tafsir-panel").forEach((node) => {
+            if (node !== panel) node.hidden = true;
+        });
+        document.querySelectorAll('[data-action="tafsir"]').forEach((node) => {
+            node.setAttribute("aria-expanded", node === button && opening ? "true" : "false");
+        });
+
+        if (!opening) {
+            panel.hidden = true;
+            return;
+        }
+
+        panel.hidden = false;
+        const cacheKey = `${state.tafsirId}:${verseKey}`;
+        if (state.tafsirCache.has(cacheKey)) {
+            renderTafsirPanel(panel, state.tafsirCache.get(cacheKey));
+            return;
+        }
+
+        renderTafsirPanel(panel, { loading: true });
+        try {
+            const data = await fetchJson(`${TAFSIR_API}/tafsirs/${state.tafsirId}/by_ayah/${verseKey}`);
+            const text = tafsirPlainText(data.tafsir?.text);
+            if (!text) throw new Error("empty");
+            const payload = {
+                text,
+                source: data.tafsir?.resource_name || TAFSIRS[state.tafsirId].name
+            };
+            state.tafsirCache.set(cacheKey, payload);
+            renderTafsirPanel(panel, payload);
+        } catch (error) {
+            console.error(error);
+            renderTafsirPanel(panel, { error: "Could not load tafsir for this verse." });
         }
     }
 
@@ -971,6 +1082,8 @@
             promptBookmark(ayah);
         } else if (action === "ayah-audio") {
             playAyahAudio(ayah);
+        } else if (action === "tafsir") {
+            toggleTafsir(actionEl.dataset.verseKey, actionEl);
         } else if (action === "confirm-bookmark") {
             const selected = document.querySelector('input[name="bookmarkCategory"]:checked');
             addBookmark(ayah, selected?.value || "general");
@@ -1017,6 +1130,18 @@
                 saveBookmarks();
                 notify("Category updated.");
             }
+        }
+        if (event.target.dataset.action === "tafsir-source") {
+            const nextId = Number(event.target.value);
+            if (!TAFSIRS[nextId]) return;
+            state.tafsirId = nextId;
+            localStorage.setItem("quranTafsir", String(nextId));
+            document.querySelectorAll(".tafsir-panel").forEach((panel) => {
+                panel.hidden = true;
+                panel.replaceChildren();
+            });
+            document.querySelectorAll('[data-action="tafsir"]').forEach((node) => node.setAttribute("aria-expanded", "false"));
+            notify(`Tafsir: ${TAFSIRS[nextId].name}`, "info");
         }
     }
 

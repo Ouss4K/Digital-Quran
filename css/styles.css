@@ -208,6 +208,10 @@ input {
     position: relative;
 }
 
+.language-selector {
+    max-width: 240px;
+}
+
 .nav-btn:hover,
 .theme-toggle:hover,
 .language-selector:hover {
@@ -712,6 +716,43 @@ input {
     font-size: var(--translation-size);
     color: var(--text-primary);
     line-height: 1.75;
+}
+
+.tafsir-panel {
+    margin-top: 14px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: rgba(44, 85, 48, 0.08);
+    border: 1px solid var(--border-color);
+    max-height: 360px;
+    overflow: auto;
+}
+
+[data-theme="dark"] .tafsir-panel {
+    background: rgba(74, 163, 223, 0.1);
+}
+
+.tafsir-source,
+.tafsir-status {
+    margin: 0 0 10px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.tafsir-body p {
+    margin: 0 0 10px;
+    font-size: 0.98rem;
+    line-height: 1.7;
+    color: var(--text-primary);
+}
+
+.tafsir-body[dir="rtl"] {
+    font-family: Amiri, "Noto Naskh Arabic", serif;
+    font-size: 1.15rem;
+}
+
+.bismillah .verse-action-btn {
+    margin-top: 12px;
 }
 
 .bookmarks-header,

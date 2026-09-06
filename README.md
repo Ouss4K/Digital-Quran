@@ -8,6 +8,7 @@ A calm, modern Quran companion for reading, listening, bookmarking, prayer times
 
 - Full Quran in Arabic with 10 translation languages
 - Recitation by Mishary Rashid Alafasy (full surah or verse)
+- Tafsir on demand: Ibn Kathir, Ma'arif al-Qur'an, Al-Muyassar, and Al-Sa'di
 - Bookmarks with categories, JSON export/import
 - Continue reading from your last verse
 - Ayah of the day
@@ -38,6 +39,7 @@ Then visit `http://localhost:8080`.
 
 - HTML, CSS, JavaScript
 - [AlQuran.cloud](https://alquran.cloud) for Quran text, translations, and audio
+- [Quran.com API](https://api-docs.quran.com) for tafsir (Ibn Kathir, Ma'arif al-Qur'an, Al-Muyassar, Al-Sa'di)
 - [AlAdhan](https://aladhan.com/rest-api) for Hijri dates, prayer times, and qibla
 
 ## Report an issue
