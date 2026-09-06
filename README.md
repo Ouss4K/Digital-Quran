@@ -1,71 +1,45 @@
-# 🌙 Digital Quran / Project in progress .
+# Digital Quran
 
-**Digital Quran** is a beautifully designed web app for reading the Quran with translation, audio, and bookmarks — all in a calm, interactive interface.
+A calm, modern Quran companion for reading, listening, bookmarking, prayer times, and dhikr — all in the browser.
 
+**Live:** [ouss4k.github.io/Digital-Quran](https://ouss4k.github.io/Digital-Quran/)
 
+## Features
 
+- Full Quran in Arabic with 10 translation languages
+- Recitation by Mishary Rashid Alafasy (full surah or verse)
+- Bookmarks with categories, JSON export/import
+- Continue reading from your last verse
+- Ayah of the day
+- Islamic calendar with upcoming Hijri dates
+- Prayer times by GPS or city, plus qibla direction
+- Daily dhikr counter
+- Dark mode, font size controls, keyboard shortcuts
+- Works as a lightweight PWA (installable, app shell cached)
 
-[![Build](https://img.shields.io/github/followers/ouss4k?label=Follow%20Me&style=social)](https://github.com/login?return_to=https%3A%2F%2Fgithub.com%2Fouss4k)
-[![Badges](https://img.shields.io/github/stars/ouss4k/Digital-Quran?style=social)]()
-[![Badges](https://img.shields.io/github/languages/code-size/ouss4k/Digital-Quran?label=Code%20Size&style=social)]()
-[![Badges](https://img.shields.io/github/directory-file-count/ouss4k/Digital-Quran?label=All%20Files&style=social)]()
+## How to run
 
+Open `index.html` in a browser, or serve the folder:
 
+```bash
+python -m http.server 8080
+```
 
+Then visit `http://localhost:8080`.
 
+## Keyboard
 
+- `/` focus search
+- `Esc` back / close modal
+- `←` `→` previous / next surah while reading
+- `Ctrl/Cmd + B` bookmarks
 
-<img width="2537" height="730" alt="image" src="https://github.com/user-attachments/assets/f32573b1-c287-430b-9b51-1c164c09fde8" />
+## Tech
 
+- HTML, CSS, JavaScript
+- [AlQuran.cloud](https://alquran.cloud) for Quran text, translations, and audio
+- [AlAdhan](https://aladhan.com/rest-api) for Hijri dates, prayer times, and qibla
 
+## Report an issue
 
-
-
-## ✨ Features
-
-
-- 📖 **Full Quran Access** – Read all 114 Surahs with English and Arabic text
-- 🔖 **Verse Bookmarks** – Save favorite verses with category labels (e.g., Worship, Guidance)
-- 🌍 **Multi-language Translations** – Choose from English, Urdu, French, Spanish, Chinese, and more
-- 📅 **Islamic Calendar** – View upcoming Islamic holidays and observances
-- 🎧 **Audio Playback** – Listen to recitation by Mishary Rashid Alafasy
-- 🔎 **Search Function** – Quickly find Surahs name or number .
-- 🌓 **Dark Mode** – Optional night-friendly reading mode
-- 🌌 **Starry Animated Background** – Clean and tranquil UI design
-
-  ## 💻 Compatibility
-
-**Digital Quran** is fully responsive and works across all modern devices:
-
-- 🖥️ Desktop and Laptop (PC/Mac/Linux)
-- 📱 Smartphones
-- 📱 Tablets
-
-## 💡 Tech Stack
-
-- **Frontend**: HTML, CSS, JavaScript
-- **API**: [AlQuran.cloud](https://alquran.cloud)
-
-## 📁 How to Run
-
-Simply open `index.html` in your browser — no setup needed!
-Or host it on your own web server.
-
----
-## 🌱 Future Plans
-
-This project is just the beginning. I plan to continue improving it with features that benefit me and my brothers and sisters in shaa Allah.
-
-Planned additions include:
-
-- 🎨 Improved and more responsive UI/UX
-- 🕰️ Daily **Prayer Times** based on location
-- 🧎‍♂️ Dhikr .
-- 📚 Save personal reading history and progress
-- 🤲 Daily Ayah reminders or reflections
-......
-  
-Reporte issue :
-
-
-📢[Report issue](https://github.com/ouss4k/Digital-Quran/issues/new)
+[Open an issue](https://github.com/Ouss4K/Digital-Quran/issues/new)

@@ -1,0 +1,19 @@
+{
+  "name": "Digital Quran",
+  "short_name": "Quran",
+  "description": "Read the Quran with translations, audio, bookmarks, prayer times, and dhikr.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#090A0F",
+  "theme_color": "#1B2735",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
