@@ -368,21 +368,77 @@
         return state.bookmarks.some((item) => item.ayahNumber === ayahNumber);
     }
 
+    const BISMILLAH_ARABIC = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ";
+    const BISMILLAH_LETTERS = "بسماللهالرحمنالرحيم";
+
+    function stripArabicMarks(text) {
+        return text
+            .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED\u08F0-\u08FF\u0640]/g, "")
+            .replace(/[ٱأإآ]/g, "ا")
+            .replace(/[ىی]/g, "ي");
+    }
+
+    function stripLeadingBismillah(text) {
+        if (!text) return text;
+        let source = text.trim();
+        if (source.startsWith("\uFDFD")) source = source.slice(1).trim();
+
+        const compact = stripArabicMarks(source).replace(/\s+/g, "");
+        if (!compact.startsWith(BISMILLAH_LETTERS)) return text.trim();
+
+        let letters = 0;
+        let index = 0;
+        while (index < source.length && letters < BISMILLAH_LETTERS.length) {
+            const char = source[index];
+            if (/\s/.test(char) || /[\u064B-\u065F\u0670\u06D6-\u06ED\u08F0-\u08FF\u0640]/.test(char)) {
+                index += 1;
+                continue;
+            }
+            const normalized = char.replace(/[ٱأإآ]/g, "ا").replace(/[ىی]/g, "ي");
+            if (normalized !== BISMILLAH_LETTERS[letters]) return text.trim();
+            letters += 1;
+            index += 1;
+        }
+        while (index < source.length && /[\u064B-\u065F\u0670\u06D6-\u06ED\u08F0-\u08FF\u0640]/.test(source[index])) {
+            index += 1;
+        }
+        while (index < source.length && /\s/.test(source[index])) {
+            index += 1;
+        }
+        const remainder = source.slice(index).trim();
+        return remainder || text.trim();
+    }
+
+    function stripLeadingBismillahTranslation(text) {
+        if (!text) return text;
+        return text.replace(
+            /^\s*in the name of allah,?\s*(the (entirely|most) (merciful|gracious),?\s*(and )?the (especially|most) merciful)\.?\s*/i,
+            ""
+        ).trim() || text.trim();
+    }
+
     function displaySurah(arabicSurah, translationSurah, scrollToVerse) {
         state.currentSurah = arabicSurah.number;
         state.verseMap.clear();
         const langName = LANGUAGES[state.language]?.name || state.language;
         const prevDisabled = arabicSurah.number <= 1 ? "disabled" : "";
         const nextDisabled = arabicSurah.number >= 114 ? "disabled" : "";
+        const stripFirstAyahBismillah = arabicSurah.number !== 1 && arabicSurah.number !== 9;
         const verses = arabicSurah.ayahs.map((ayah, index) => {
-            const translation = translationSurah.ayahs[index]?.text || "Translation not available";
+            let arabic = ayah.text;
+            let translation = translationSurah.ayahs[index]?.text || "Translation not available";
+            if (stripFirstAyahBismillah && ayah.numberInSurah === 1) {
+                arabic = stripLeadingBismillah(arabic);
+                translation = stripLeadingBismillahTranslation(translation);
+            }
             state.verseMap.set(ayah.number, {
-                arabic: ayah.text,
+                arabic,
                 translation,
                 verseNumber: ayah.numberInSurah,
                 surahNumber: arabicSurah.number,
                 surahName: arabicSurah.englishName
             });
+            if (arabicSurah.number === 1 && ayah.numberInSurah === 1) return "";
             const marked = isBookmarked(ayah.number);
             return `
                 <article class="verse-container${marked ? " bookmarked" : ""}" id="verse-${ayah.number}" data-verse="${ayah.numberInSurah}" data-ayah="${ayah.number}">
@@ -395,15 +451,15 @@
                             <button class="verse-action-btn${marked ? " bookmarked" : ""}" type="button" data-action="bookmark" data-ayah="${ayah.number}" aria-label="Bookmark verse">${marked ? "Saved" : "Save"}</button>
                         </div>
                     </div>
-                    <div class="arabic-verse" lang="ar" dir="rtl">${escapeHtml(ayah.text)}</div>
+                    <div class="arabic-verse" lang="ar" dir="rtl">${escapeHtml(arabic)}</div>
                     <div class="verse-translation">${escapeHtml(translation)}</div>
                 </article>
             `;
         }).join("");
 
-        const bismillah = arabicSurah.number !== 9 && arabicSurah.number !== 1 ? `
+        const bismillah = arabicSurah.number !== 9 ? `
             <div class="bismillah">
-                <div class="bismillah-arabic" lang="ar" dir="rtl">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</div>
+                <div class="bismillah-arabic" lang="ar" dir="rtl">${BISMILLAH_ARABIC}</div>
                 <div class="bismillah-translation">In the name of Allah, the Most Gracious, the Most Merciful</div>
             </div>
         ` : "";
