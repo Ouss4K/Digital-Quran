@@ -10,7 +10,8 @@
     --arabic-text: #1a472a;
     --danger: #dc3545;
     --gold: #e4c441;
-    --arabic-size: 1.8rem;
+    --arabic-size: 1.9rem;
+    --arabic-title-size: 1.4rem;
     --translation-size: 1.1rem;
     --radius: 18px;
     --shadow: 0 10px 32px rgba(0, 0, 0, 0.16);
@@ -39,6 +40,8 @@
 html {
     scroll-behavior: smooth;
     background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
 }
 
 body {
@@ -210,6 +213,12 @@ input {
 
 .language-selector {
     max-width: 240px;
+    font-size: 16px;
+}
+
+.quick-link.active {
+    background: var(--gold);
+    color: #333;
 }
 
 .nav-btn:hover,
@@ -336,6 +345,11 @@ input {
     background: rgba(255, 255, 255, 0.28);
 }
 
+.quick-link.active:hover {
+    background: var(--gold);
+    color: #333;
+}
+
 .home-panels {
     display: grid;
     grid-template-columns: 1.2fr 1fr;
@@ -375,12 +389,58 @@ input {
 
 .daily-arabic {
     font-family: Amiri, "Noto Naskh Arabic", serif;
-    font-size: 1.5rem;
+    font-size: var(--arabic-size);
     direction: rtl;
     text-align: right;
     color: var(--arabic-text);
     line-height: 1.9;
     margin-bottom: 10px;
+}
+
+.favorites-panel {
+    margin-bottom: 22px;
+}
+
+.favorites-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.favorite-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--verse-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: 999px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 14px;
+}
+
+.favorite-chip:hover {
+    border-color: var(--accent-color);
+}
+
+.favorite-chip span:first-child {
+    background: var(--accent-color);
+    color: #fff;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.favorite-chip [lang="ar"] {
+    font-family: Amiri, "Noto Naskh Arabic", serif;
+    color: var(--arabic-text);
 }
 
 .btn,
@@ -481,7 +541,7 @@ input {
 
 .arabic-name {
     font-family: Amiri, "Noto Naskh Arabic", serif;
-    font-size: 1.25rem;
+    font-size: var(--arabic-title-size);
     color: var(--text-secondary);
     direction: rtl;
     margin-bottom: 10px;
@@ -532,7 +592,8 @@ input {
     flex: 1;
 }
 
-.btn-play {
+.btn-play,
+.btn-fav {
     background: rgba(44, 85, 48, 0.1);
     color: var(--accent-color);
     border: 2px solid var(--accent-color);
@@ -540,6 +601,21 @@ input {
     width: 44px;
     height: 44px;
     cursor: pointer;
+    font-size: 1.1rem;
+    line-height: 1;
+}
+
+.btn-fav {
+    background: rgba(228, 196, 65, 0.12);
+    color: #c9a227;
+    border-color: var(--gold);
+}
+
+.btn-fav.active,
+.reading-toolbar [data-action="favorite-surah"].active {
+    background: var(--gold);
+    color: #333;
+    box-shadow: none;
 }
 
 .btn-play.playing {
@@ -577,6 +653,11 @@ input {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
+    align-items: center;
+}
+
+.reading-toolbar .back-btn {
+    margin-bottom: 0;
 }
 
 .surah-header-reading {
@@ -594,7 +675,7 @@ input {
 
 .surah-arabic-title {
     font-family: Amiri, "Noto Naskh Arabic", serif;
-    font-size: 2rem;
+    font-size: calc(var(--arabic-title-size) * 1.45);
     color: var(--arabic-text);
     direction: rtl;
 }
@@ -620,7 +701,7 @@ input {
 
 .bismillah-arabic {
     font-family: Amiri, "Noto Naskh Arabic", serif;
-    font-size: 2.1rem;
+    font-size: calc(var(--arabic-size) * 1.05);
     color: var(--arabic-text);
     direction: rtl;
     font-weight: 700;
@@ -718,6 +799,12 @@ input {
     line-height: 1.75;
 }
 
+.arabic-only .verse-translation,
+.arabic-only .bismillah-translation,
+.arabic-only #dailyAyahTranslation {
+    display: none;
+}
+
 .tafsir-panel {
     margin-top: 14px;
     padding: 14px 16px;
@@ -807,7 +894,7 @@ input {
 
 .bookmark-arabic {
     font-family: Amiri, "Noto Naskh Arabic", serif;
-    font-size: 1.35rem;
+    font-size: calc(var(--arabic-size) * 0.72);
     color: var(--arabic-text);
     direction: rtl;
     text-align: right;
@@ -895,6 +982,7 @@ input {
     color: var(--text-primary);
     padding: 8px 10px;
     border-radius: 10px;
+    font-size: 16px;
 }
 
 .qibla {
@@ -1086,9 +1174,11 @@ input {
     .page-card {
         padding: 16px;
     }
+}
 
-    .arabic-verse {
-        font-size: 1.5rem;
+@media (min-width: 641px) {
+    .language-selector {
+        font-size: 13px;
     }
 }
 

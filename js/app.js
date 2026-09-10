@@ -15,6 +15,7 @@
     };
 
     const LANGUAGES = {
+        "ar": { name: "العربية", short: "العربية", rtl: true, arabicOnly: true },
         "en.sahih": { name: "English (Sahih International)", short: "English" },
         "fr.hamidullah": { name: "Français (Hamidullah)", short: "Français" },
         "es.cortes": { name: "Español (Julio Cortés)", short: "Español" },
@@ -63,6 +64,8 @@
         language: localStorage.getItem("quranLanguage") || "en.sahih",
         theme: localStorage.getItem("quranTheme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"),
         bookmarks: loadJson("quranBookmarks", []),
+        favoriteSurahs: loadJson("quranFavoriteSurahs", []).map(Number).filter((n) => n >= 1 && n <= 114),
+        showFavoritesOnly: false,
         category: "all",
         currentSurah: null,
         currentVerse: 1,
@@ -150,6 +153,7 @@
             "dailyAyahMeta", "dailyAyahArabic", "dailyAyahTranslation", "dailyAyahReadBtn",
             "loadingIndicator", "surahsGrid", "bookmarksList", "bookmarkCategories",
             "importBookmarksBtn", "exportBookmarksBtn", "clearBookmarksBtn", "importBookmarksFile",
+            "favoritesFilterBtn", "favoritesPanel", "favoritesList",
             "hijriToday", "holidaysList", "useLocationBtn", "cityInput", "countryInput",
             "lookupCityBtn", "methodSelect", "prayerStatus", "prayerGrid", "qiblaInfo",
             "resetDhikrBtn", "dhikrGrid", "surahReading", "appModal", "modalContent",
@@ -166,19 +170,29 @@
         localStorage.setItem("quranTheme", theme);
     }
 
+    function isArabicOnly() {
+        return Boolean(LANGUAGES[state.language]?.arabicOnly);
+    }
+
     function applyFontScale() {
-        const scale = Math.min(1.4, Math.max(0.85, state.fontScale));
-        state.fontScale = scale;
-        document.documentElement.style.setProperty("--arabic-size", `${1.8 * scale}rem`);
-        document.documentElement.style.setProperty("--translation-size", `${1.1 * scale}rem`);
-        localStorage.setItem("quranFontScale", String(scale));
+        const scale = Math.min(1.8, Math.max(0.85, state.fontScale));
+        state.fontScale = Number(scale.toFixed(2));
+        const arabicBase = isArabicOnly() ? 2.2 : 1.9;
+        document.documentElement.style.setProperty("--arabic-size", `${arabicBase * state.fontScale}rem`);
+        document.documentElement.style.setProperty("--arabic-title-size", `${1.4 * state.fontScale}rem`);
+        document.documentElement.style.setProperty("--translation-size", `${1.1 * state.fontScale}rem`);
+        document.documentElement.classList.toggle("arabic-only", isArabicOnly());
+        document.documentElement.lang = isArabicOnly() ? "ar" : "en";
+        localStorage.setItem("quranFontScale", String(state.fontScale));
     }
 
     function fillLanguages() {
+        if (!LANGUAGES[state.language]) state.language = "en.sahih";
         els.languageSelector.innerHTML = Object.entries(LANGUAGES)
             .map(([id, lang]) => `<option value="${id}">${escapeHtml(lang.short)}</option>`)
             .join("");
         els.languageSelector.value = state.language;
+        applyFontScale();
     }
 
     function showView(name) {
@@ -199,7 +213,10 @@
         if (name === "calendar") renderCalendar();
         if (name === "prayer") renderPrayer();
         if (name === "dhikr") renderDhikr();
-        if (name === "home") renderContinue();
+        if (name === "home") {
+            renderContinue();
+            renderFavoriteSurahs();
+        }
     }
 
     function updateBookmarkCount() {
@@ -213,16 +230,89 @@
         updateBookmarkCount();
     }
 
+    function isFavoriteSurah(number) {
+        return state.favoriteSurahs.includes(Number(number));
+    }
+
+    function updateFavoriteUI() {
+        renderFavoriteSurahs();
+        if (els.favoritesFilterBtn) {
+            const count = state.favoriteSurahs.length;
+            els.favoritesFilterBtn.textContent = count ? `★ Favorites (${count})` : "★ Favorites";
+            els.favoritesFilterBtn.classList.toggle("active", state.showFavoritesOnly);
+        }
+        document.querySelectorAll('[data-action="favorite-surah"]').forEach((btn) => {
+            const id = Number(btn.dataset.surah);
+            const on = isFavoriteSurah(id);
+            btn.classList.toggle("active", on);
+            btn.setAttribute("aria-pressed", String(on));
+            if (btn.closest(".reading-toolbar")) btn.textContent = on ? "★ Favorited" : "☆ Favorite";
+            else if (btn.classList.contains("btn-fav")) btn.textContent = on ? "★" : "☆";
+        });
+    }
+
+    function saveFavoriteSurahs() {
+        saveJson("quranFavoriteSurahs", state.favoriteSurahs);
+        updateFavoriteUI();
+    }
+
+    function toggleFavoriteSurah(number) {
+        const id = Number(number);
+        if (isFavoriteSurah(id)) {
+            state.favoriteSurahs = state.favoriteSurahs.filter((item) => item !== id);
+            notify("Removed from favorites.");
+        } else {
+            state.favoriteSurahs.push(id);
+            notify("Added to favorite surahs.");
+        }
+        saveFavoriteSurahs();
+        renderSurahs();
+    }
+
+    function renderFavoriteSurahs() {
+        if (!els.favoritesPanel || !els.favoritesList) return;
+        if (!state.favoriteSurahs.length) {
+            els.favoritesPanel.hidden = true;
+            els.favoritesList.innerHTML = "";
+            return;
+        }
+        els.favoritesPanel.hidden = false;
+        const items = state.favoriteSurahs
+            .map((number) => state.surahs.find((surah) => surah.number === number))
+            .filter(Boolean);
+        els.favoritesList.innerHTML = items.map((surah) => `
+            <button class="favorite-chip" type="button" data-action="read" data-surah="${surah.number}">
+                <span>${surah.number}</span>
+                ${escapeHtml(surah.englishName)}
+                <span lang="ar" dir="rtl">${escapeHtml(surah.name)}</span>
+            </button>
+        `).join("");
+    }
+
+    function visibleSurahs() {
+        let list = state.filtered;
+        if (state.showFavoritesOnly) {
+            list = list.filter((surah) => isFavoriteSurah(surah.number));
+        }
+        return [...list].sort((a, b) => {
+            const favDiff = Number(isFavoriteSurah(b.number)) - Number(isFavoriteSurah(a.number));
+            return favDiff || a.number - b.number;
+        });
+    }
+
     function renderSurahs() {
         const grid = els.surahsGrid;
         grid.innerHTML = "";
-        if (!state.filtered.length) {
-            grid.innerHTML = '<div class="error-message">No surahs match that search.</div>';
+        const list = visibleSurahs();
+        if (!list.length) {
+            grid.innerHTML = `<div class="error-message">${state.showFavoritesOnly ? "No favorite surahs yet. Tap the star on a surah card." : "No surahs match that search."}</div>`;
+            updateFavoriteUI();
             return;
         }
         const fragment = document.createDocumentFragment();
-        state.filtered.forEach((surah) => {
+        list.forEach((surah) => {
             const type = surah.revelationType.toLowerCase();
+            const fav = isFavoriteSurah(surah.number);
             const card = document.createElement("article");
             card.className = "surah-card";
             card.tabIndex = 0;
@@ -237,12 +327,14 @@
                 </div>
                 <div class="surah-actions">
                     <button class="btn-read" type="button" data-action="read" data-surah="${surah.number}">Read</button>
+                    <button class="btn-fav${fav ? " active" : ""}" type="button" data-action="favorite-surah" data-surah="${surah.number}" aria-label="${fav ? "Remove from favorites" : "Add to favorites"}" aria-pressed="${fav}">${fav ? "★" : "☆"}</button>
                     <button class="btn-play" type="button" data-action="play" data-surah="${surah.number}" aria-label="Play recitation">▶</button>
                 </div>
             `;
             fragment.appendChild(card);
         });
         grid.appendChild(fragment);
+        updateFavoriteUI();
     }
 
     function simplify(value) {
@@ -434,12 +526,16 @@
         const prevDisabled = arabicSurah.number <= 1 ? "disabled" : "";
         const nextDisabled = arabicSurah.number >= 114 ? "disabled" : "";
         const stripFirstAyahBismillah = arabicSurah.number !== 1 && arabicSurah.number !== 9;
+        const arabicOnly = isArabicOnly();
         const verses = arabicSurah.ayahs.map((ayah, index) => {
             let arabic = ayah.text;
-            let translation = translationSurah.ayahs[index]?.text || "Translation not available";
+            let translation = "";
+            if (!arabicOnly) {
+                translation = translationSurah.ayahs[index]?.text || "Translation not available";
+            }
             if (stripFirstAyahBismillah && ayah.numberInSurah === 1) {
                 arabic = stripLeadingBismillah(arabic);
-                translation = stripLeadingBismillahTranslation(translation);
+                if (translation) translation = stripLeadingBismillahTranslation(translation);
             }
             state.verseMap.set(ayah.number, {
                 arabic,
@@ -462,7 +558,7 @@
                         </div>
                     </div>
                     <div class="arabic-verse" lang="ar" dir="rtl">${escapeHtml(arabic)}</div>
-                    <div class="verse-translation">${escapeHtml(translation)}</div>
+                    ${translation ? `<div class="verse-translation">${escapeHtml(translation)}</div>` : ""}
                     <div class="tafsir-panel" data-tafsir-panel="${arabicSurah.number}:${ayah.numberInSurah}" hidden></div>
                 </article>
             `;
@@ -475,6 +571,7 @@
             </div>
         ` : "";
 
+        const fav = isFavoriteSurah(arabicSurah.number);
         els.surahReading.innerHTML = `
             <div class="reading-toolbar">
                 <div class="toolbar-group">
@@ -483,6 +580,7 @@
                     <button class="btn secondary" type="button" data-action="next-surah" ${nextDisabled}>Next</button>
                 </div>
                 <div class="toolbar-group">
+                    <button class="btn secondary${fav ? " active" : ""}" type="button" data-action="favorite-surah" data-surah="${arabicSurah.number}" aria-pressed="${fav}">${fav ? "★ Favorited" : "☆ Favorite"}</button>
                     <label class="visually-hidden" for="tafsirSelect">Tafsir source</label>
                     <select class="language-selector" id="tafsirSelect" data-action="tafsir-source">${tafsirOptions()}</select>
                     <button class="btn secondary" type="button" data-action="font-down" aria-label="Decrease text size">A−</button>
@@ -622,11 +720,13 @@
         showView("reading");
         els.surahReading.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading Surah…</p></div>';
         try {
-            const [arabic, translation] = await Promise.all([
-                fetchJson(`${API_BASE}/surah/${number}`),
-                fetchJson(`${API_BASE}/surah/${number}/${state.language}`)
-            ]);
-            if (arabic.code !== 200 || translation.code !== 200) throw new Error("Bad API response");
+            const arabic = await fetchJson(`${API_BASE}/surah/${number}`);
+            if (arabic.code !== 200) throw new Error("Bad API response");
+            let translation = arabic;
+            if (!isArabicOnly()) {
+                translation = await fetchJson(`${API_BASE}/surah/${number}/${state.language}`);
+                if (translation.code !== 200) throw new Error("Bad API response");
+            }
             displaySurah(arabic.data, translation.data, scrollToVerse);
         } catch (error) {
             console.error(error);
@@ -635,10 +735,17 @@
         }
     }
 
+    function verseShareText(verse) {
+        const arabic = verse.arabic || verse.arabicText || "";
+        const translation = verse.translation;
+        const ref = `— Surah ${verse.surahName}, ${verse.verseNumber}`;
+        return translation ? `${arabic}\n\n"${translation}"\n\n${ref}` : `${arabic}\n\n${ref}`;
+    }
+
     async function copyVerse(ayahNumber) {
         const verse = state.verseMap.get(ayahNumber) || state.bookmarks.find((item) => item.ayahNumber === ayahNumber);
         if (!verse) return;
-        const text = `${verse.arabic || verse.arabicText}\n\n"${verse.translation}"\n\n— Surah ${verse.surahName}, ${verse.verseNumber}`;
+        const text = verseShareText(verse);
         try {
             await navigator.clipboard.writeText(text);
             notify("Verse copied.");
@@ -650,7 +757,7 @@
     async function shareVerse(ayahNumber) {
         const verse = state.verseMap.get(ayahNumber);
         if (!verse) return;
-        const text = `${verse.arabic}\n\n"${verse.translation}"\n\n— Surah ${verse.surahName}, ${verse.verseNumber}`;
+        const text = verseShareText(verse);
         if (navigator.share) {
             try {
                 await navigator.share({ title: `Surah ${verse.surahName}`, text });
@@ -994,16 +1101,18 @@
         const day = Math.floor(Date.now() / 86400000);
         const ayahNumber = (day % 6236) + 1;
         try {
-            const [arabic, translation] = await Promise.all([
-                fetchJson(`${API_BASE}/ayah/${ayahNumber}`),
-                fetchJson(`${API_BASE}/ayah/${ayahNumber}/${state.language}`)
-            ]);
+            const arabic = await fetchJson(`${API_BASE}/ayah/${ayahNumber}`);
+            let translationText = "";
+            if (!isArabicOnly()) {
+                const translation = await fetchJson(`${API_BASE}/ayah/${ayahNumber}/${state.language}`);
+                translationText = translation.data.text;
+            }
             state.dailyAyah = {
                 surah: arabic.data.surah.number,
                 verse: arabic.data.numberInSurah,
                 name: arabic.data.surah.englishName,
                 arabic: arabic.data.text,
-                translation: translation.data.text
+                translation: translationText
             };
             els.dailyAyahMeta.textContent = `Surah ${state.dailyAyah.name}, verse ${state.dailyAyah.verse}`;
             els.dailyAyahArabic.textContent = state.dailyAyah.arabic;
@@ -1018,11 +1127,15 @@
             const surahNumber = Math.floor(Math.random() * 114) + 1;
             const data = await fetchJson(`${API_BASE}/surah/${surahNumber}`);
             const ayah = data.data.ayahs[Math.floor(Math.random() * data.data.ayahs.length)];
-            const translation = await fetchJson(`${API_BASE}/ayah/${ayah.number}/${state.language}`);
+            let translationHtml = "";
+            if (!isArabicOnly()) {
+                const translation = await fetchJson(`${API_BASE}/ayah/${ayah.number}/${state.language}`);
+                translationHtml = `<p class="verse-translation">${escapeHtml(translation.data.text)}</p>`;
+            }
             openModal(`
                 <h3 id="modalTitle">Random verse</h3>
                 <div class="arabic-verse" lang="ar" dir="rtl">${escapeHtml(ayah.text)}</div>
-                <p class="verse-translation">${escapeHtml(translation.data.text)}</p>
+                ${translationHtml}
                 <p class="ayah-meta">Surah ${escapeHtml(data.data.englishName)}, verse ${ayah.numberInSurah}</p>
                 <div class="modal-actions">
                     <button class="modal-btn secondary" type="button" data-action="close-modal">Close</button>
@@ -1069,6 +1182,12 @@
         } else if (action === "play") {
             event.stopPropagation();
             playSurahAudio(surah, actionEl);
+        } else if (action === "favorite-surah") {
+            event.stopPropagation();
+            toggleFavoriteSurah(surah);
+        } else if (action === "toggle-favorites") {
+            state.showFavoritesOnly = !state.showFavoritesOnly;
+            renderSurahs();
         } else if (action === "copy") {
             copyVerse(ayah);
         } else if (action === "share") {
@@ -1151,6 +1270,7 @@
         });
         els.surahsGrid.addEventListener("keydown", (event) => {
             if (event.key === "Enter" || event.key === " ") {
+                if (event.target.closest("[data-action]")) return;
                 const card = event.target.closest(".surah-card");
                 if (card) {
                     event.preventDefault();
@@ -1175,7 +1295,9 @@
         els.languageSelector.addEventListener("change", () => {
             state.language = els.languageSelector.value;
             localStorage.setItem("quranLanguage", state.language);
-            notify(`Translation: ${LANGUAGES[state.language].name}`, "info");
+            applyFontScale();
+            const lang = LANGUAGES[state.language];
+            notify(lang.arabicOnly ? `Language: ${lang.name}` : `Translation: ${lang.name}`, "info");
             loadDailyAyah();
             if (state.view === "reading" && state.currentSurah) readSurah(state.currentSurah, state.currentVerse);
         });

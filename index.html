@@ -40,7 +40,7 @@
                 <button class="nav-btn" type="button" data-nav="calendar">Calendar</button>
                 <button class="nav-btn" type="button" data-nav="prayer">Prayer</button>
                 <button class="nav-btn" type="button" data-nav="dhikr">Dhikr</button>
-                <label class="visually-hidden" for="languageSelector">Translation language</label>
+                <label class="visually-hidden" for="languageSelector">Language</label>
                 <select class="language-selector" id="languageSelector"></select>
                 <button class="theme-toggle" type="button" id="themeToggle">Dark Mode</button>
             </nav>
@@ -61,6 +61,7 @@
                         <button class="quick-link" type="button" data-quick="Al-Mulk">Al-Mulk</button>
                         <button class="quick-link" type="button" data-quick="Ya-Sin">Ya-Sin</button>
                         <button class="quick-link" type="button" data-quick="Al-Faatiha">Al-Fatiha</button>
+                        <button class="quick-link" type="button" id="favoritesFilterBtn" data-action="toggle-favorites">★ Favorites</button>
                         <button class="quick-link" type="button" id="randomVerseBtn">Random verse</button>
                     </div>
                 </div>
@@ -79,6 +80,11 @@
                         <button class="btn secondary" type="button" id="dailyAyahReadBtn">Read this surah</button>
                     </article>
                 </div>
+
+                <article class="panel favorites-panel" id="favoritesPanel" hidden>
+                    <h2>Favorite surahs</h2>
+                    <div class="favorites-list" id="favoritesList"></div>
+                </article>
 
                 <div id="loadingIndicator" class="loading">
                     <div class="spinner"></div>
