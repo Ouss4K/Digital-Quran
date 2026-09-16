@@ -77,6 +77,7 @@
         progressHandler: null,
         verseObserver: null,
         lastRead: loadJson("quranLastRead", null),
+        listScroll: Number(sessionStorage.getItem("quranListScroll") || 0),
         fontScale: Number(localStorage.getItem("quranFontScale") || 1),
         tafsirId: Number(localStorage.getItem("quranTafsir") || 169),
         tafsirCache: new Map(),
@@ -195,7 +196,34 @@
         applyFontScale();
     }
 
+    function saveListScroll() {
+        if (state.view !== "home") return;
+        state.listScroll = window.scrollY;
+        sessionStorage.setItem("quranListScroll", String(state.listScroll));
+    }
+
+    function restoreListScroll() {
+        const y = Math.max(0, Number(state.listScroll) || 0);
+        const html = document.documentElement;
+        const previous = html.style.scrollBehavior;
+        html.style.scrollBehavior = "auto";
+        window.scrollTo({ top: y, left: 0, behavior: "auto" });
+        requestAnimationFrame(() => {
+            window.scrollTo({ top: y, left: 0, behavior: "auto" });
+            html.style.scrollBehavior = previous;
+        });
+    }
+
+    function resumeVerseFor(number) {
+        const last = state.lastRead;
+        if (!last || Number(last.surahNumber) !== Number(number)) return undefined;
+        const verse = Number(last.verseNumber);
+        return verse > 1 ? verse : undefined;
+    }
+
     function showView(name) {
+        if (state.view === "home" && name !== "home") saveListScroll();
+        if (state.view === "reading" && name !== "reading") saveLastRead();
         state.view = name;
         document.querySelectorAll("[data-view]").forEach((section) => {
             section.hidden = section.dataset.view !== name;
@@ -208,7 +236,6 @@
             els.readingProgress.style.width = "0%";
             teardownReading();
         }
-        window.scrollTo({ top: 0, behavior: "smooth" });
         if (name === "bookmarks") renderBookmarks();
         if (name === "calendar") renderCalendar();
         if (name === "prayer") renderPrayer();
@@ -216,6 +243,9 @@
         if (name === "home") {
             renderContinue();
             renderFavoriteSurahs();
+            restoreListScroll();
+        } else {
+            window.scrollTo({ top: 0, behavior: "auto" });
         }
     }
 
@@ -521,6 +551,7 @@
 
     function displaySurah(arabicSurah, translationSurah, scrollToVerse) {
         state.currentSurah = arabicSurah.number;
+        state.currentVerse = scrollToVerse || 1;
         state.verseMap.clear();
         const langName = LANGUAGES[state.language]?.name || state.language;
         const prevDisabled = arabicSurah.number <= 1 ? "disabled" : "";
@@ -1178,7 +1209,7 @@
 
         if (action === "read") {
             closeModal();
-            readSurah(surah, Number(actionEl.dataset.verse) || undefined);
+            readSurah(surah, Number(actionEl.dataset.verse) || resumeVerseFor(surah));
         } else if (action === "play") {
             event.stopPropagation();
             playSurahAudio(surah, actionEl);
@@ -1266,7 +1297,7 @@
         els.surahsGrid.addEventListener("click", (event) => {
             if (event.target.closest("[data-action]")) return;
             const card = event.target.closest(".surah-card");
-            if (card) readSurah(Number(card.dataset.surah));
+            if (card) readSurah(Number(card.dataset.surah), resumeVerseFor(card.dataset.surah));
         });
         els.surahsGrid.addEventListener("keydown", (event) => {
             if (event.key === "Enter" || event.key === " ") {
@@ -1274,7 +1305,7 @@
                 const card = event.target.closest(".surah-card");
                 if (card) {
                     event.preventDefault();
-                    readSurah(Number(card.dataset.surah));
+                    readSurah(Number(card.dataset.surah), resumeVerseFor(card.dataset.surah));
                 }
             }
         });
