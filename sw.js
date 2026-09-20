@@ -1,4 +1,4 @@
-const CACHE = "digital-quran-v5";
+const CACHE = "digital-quran-v11";
 const ASSETS = [
     "./",
     "./index.html",

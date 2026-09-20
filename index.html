@@ -147,9 +147,37 @@
                             <option value="12">UOIF, France</option>
                         </select>
                     </div>
-                    <p id="prayerStatus">Choose a location to load today's prayer times.</p>
+                    <div class="mosque-search-block">
+                        <h3>Mosque times (Mawaqit)</h3>
+                        <div class="location-row">
+                            <input type="search" id="mosqueSearchInput" placeholder="Search mosque, city, or postcode…" aria-label="Search mosques" autocomplete="off">
+                            <button class="btn secondary" type="button" id="mosqueSearchBtn">Search</button>
+                        </div>
+                        <p class="mosque-status" id="mosqueStatus">Search or use your location to load mosque prayer times from Mawaqit.</p>
+                    </div>
+                    <p id="prayerStatus">Choose a location or mosque to load today's prayer times.</p>
                     <div class="prayer-grid" id="prayerGrid"></div>
-                    <p class="qibla" id="qiblaInfo"></p>
+
+                    <div class="prayer-alerts">
+                        <label class="alert-toggle">
+                            <input type="checkbox" id="prayerAlertsToggle">
+                            Prayer alerts
+                        </label>
+                        <select id="prayerAlertLead" aria-label="Alert timing">
+                            <option value="0">At prayer time</option>
+                            <option value="5">5 minutes before</option>
+                            <option value="10">10 minutes before</option>
+                            <option value="15">15 minutes before</option>
+                        </select>
+                        <button class="btn secondary" type="button" id="testPrayerAlertBtn">Test alert</button>
+                    </div>
+                    <p class="alert-hint" id="prayerAlertHint">Get a popup when the next prayer is near. Allow notifications for a system alert too.</p>
+
+                    <div class="mosque-section">
+                        <h3>Nearby mosques</h3>
+                        <div id="selectedMosque"></div>
+                        <div class="mosque-list" id="mosqueList"></div>
+                    </div>
                 </div>
             </section>
 
@@ -173,6 +201,15 @@
 
     <div class="modal" id="appModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
         <div class="modal-content" id="modalContent"></div>
+    </div>
+
+    <div class="prayer-alert" id="prayerAlert" hidden>
+        <div class="prayer-alert-card" role="alertdialog" aria-modal="true" aria-labelledby="prayerAlertTitle" aria-describedby="prayerAlertBody">
+            <p class="prayer-alert-kicker" id="prayerAlertKicker">Prayer time</p>
+            <h3 id="prayerAlertTitle"></h3>
+            <p id="prayerAlertBody"></p>
+            <button class="btn" type="button" data-action="dismiss-prayer-alert">OK</button>
+        </div>
     </div>
 
     <script src="js/app.js" defer></script>

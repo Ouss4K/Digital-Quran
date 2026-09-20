@@ -6,6 +6,7 @@
     const AUDIO_AYAH = "https://cdn.islamic.network/quran/audio/128/ar.alafasy";
     const ALADHAN = "https://api.aladhan.com/v1";
     const TAFSIR_API = "https://api.quran.com/api/v4";
+    const MAWAQIT = "https://mawaqit.net/api/2.0";
 
     const TAFSIRS = {
         169: { name: "Ibn Kathir (English, abridged)", rtl: false },
@@ -81,7 +82,19 @@
         fontScale: Number(localStorage.getItem("quranFontScale") || 1),
         tafsirId: Number(localStorage.getItem("quranTafsir") || 169),
         tafsirCache: new Map(),
-        prayer: loadJson("quranPrayerPrefs", { method: "3", city: "", country: "", lat: null, lng: null }),
+        prayer: loadJson("quranPrayerPrefs", {
+            method: "3",
+            city: "",
+            country: "",
+            lat: null,
+            lng: null,
+            mosque: null,
+            alertsEnabled: false,
+            alertLead: 10
+        }),
+        nearbyMosques: [],
+        alertedPrayers: new Set(),
+        prayerTick: null,
         dhikr: loadDhikr(),
         dailyAyah: null
     };
@@ -156,7 +169,10 @@
             "importBookmarksBtn", "exportBookmarksBtn", "clearBookmarksBtn", "importBookmarksFile",
             "favoritesFilterBtn", "favoritesPanel", "favoritesList",
             "hijriToday", "holidaysList", "useLocationBtn", "cityInput", "countryInput",
-            "lookupCityBtn", "methodSelect", "prayerStatus", "prayerGrid", "qiblaInfo",
+            "lookupCityBtn", "methodSelect", "prayerStatus", "prayerGrid",
+            "prayerAlertsToggle", "prayerAlertLead", "prayerAlertHint", "testPrayerAlertBtn",
+            "mosqueSearchInput", "mosqueSearchBtn", "mosqueStatus", "mosqueList", "selectedMosque",
+            "prayerAlert", "prayerAlertKicker", "prayerAlertTitle", "prayerAlertBody",
             "resetDhikrBtn", "dhikrGrid", "surahReading", "appModal", "modalContent",
             "readingProgress"
         ].forEach((id) => {
@@ -1039,19 +1055,434 @@
     }
 
     function prayerLabel(name) {
-        return { Fajr: "Fajr", Sunrise: "Sunrise", Dhuhr: "Dhuhr", Asr: "Asr", Maghrib: "Maghrib", Isha: "Isha" }[name];
+        return {
+            Fajr: "Fajr",
+            Sunrise: "Sunrise",
+            Dhuhr: "Dhuhr",
+            Asr: "Asr",
+            Maghrib: "Maghrib",
+            Isha: "Isha",
+            Jumua: "Jumu'ah",
+            Jumua2: "Jumu'ah 2"
+        }[name] || name;
     }
 
     function nextPrayer(timings) {
         const order = ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"];
         const now = new Date();
         for (const name of order) {
-            const [h, m] = timings[name].slice(0, 5).split(":").map(Number);
-            const when = new Date();
-            when.setHours(h, m, 0, 0);
-            if (when > now) return name;
+            if (!timings[name]) continue;
+            const when = prayerClock(timings[name]);
+            if (when && when > now) return name;
         }
         return "Fajr";
+    }
+
+    function prayerClock(hhmm, dayOffset = 0) {
+        const match = String(hhmm || "").trim().match(/^(\d{1,2}):(\d{2})/);
+        if (!match) return null;
+        const when = new Date();
+        when.setDate(when.getDate() + dayOffset);
+        when.setHours(Number(match[1]), Number(match[2]), 0, 0);
+        return when;
+    }
+
+    function addMinutes(hhmm, offset) {
+        const raw = String(offset ?? "").trim();
+        if (!raw) return "";
+        if (raw.includes(":")) return raw.slice(0, 5);
+        const mins = Number(raw.replace("+", ""));
+        if (!Number.isFinite(mins)) return "";
+        const when = prayerClock(hhmm);
+        if (!when) return "";
+        when.setMinutes(when.getMinutes() + mins);
+        return `${String(when.getHours()).padStart(2, "0")}:${String(when.getMinutes()).padStart(2, "0")}`;
+    }
+
+    function haversineKm(lat1, lng1, lat2, lng2) {
+        const toRad = (value) => (value * Math.PI) / 180;
+        const dLat = toRad(lat2 - lat1);
+        const dLng = toRad(lng2 - lng1);
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+        return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function mosqueTimings(mosque) {
+        const names = ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"];
+        const out = {};
+        names.forEach((name, index) => {
+            out[name] = String(mosque?.times?.[index] || "").slice(0, 5);
+        });
+        if (mosque?.jumua) out.Jumua = String(mosque.jumua).slice(0, 5);
+        if (mosque?.jumua2) out.Jumua2 = String(mosque.jumua2).slice(0, 5);
+        return out;
+    }
+
+    function mosqueIqama(mosque, name) {
+        const index = { Fajr: 0, Dhuhr: 1, Asr: 2, Maghrib: 3, Isha: 4 }[name];
+        if (index == null) return "";
+        const adhan = mosqueTimings(mosque)[name];
+        return addMinutes(adhan, mosque?.iqama?.[index]);
+    }
+
+    function currentAlertTimings() {
+        if (state.prayer.mosque?.times) return mosqueTimings(state.prayer.mosque);
+        return state.prayer.timings || null;
+    }
+
+    function savePrayerPrefs() {
+        saveJson("quranPrayerPrefs", {
+            method: state.prayer.method,
+            city: state.prayer.city || "",
+            country: state.prayer.country || "",
+            lat: state.prayer.lat ?? null,
+            lng: state.prayer.lng ?? null,
+            mosque: state.prayer.mosque || null,
+            alertsEnabled: Boolean(state.prayer.alertsEnabled),
+            alertLead: Number(state.prayer.alertLead) || 10
+        });
+    }
+
+    function prayerTimeNames(timings) {
+        const names = ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"];
+        if (timings?.Jumua) names.push("Jumua");
+        if (timings?.Jumua2) names.push("Jumua2");
+        return names;
+    }
+
+    function renderPrayerGrid(timings, mosque) {
+        const next = nextPrayer(timings);
+        els.prayerGrid.classList.toggle("mawaqit", Boolean(mosque));
+        els.prayerGrid.innerHTML = prayerTimeNames(timings).map((name) => {
+            const iqama = mosque ? mosqueIqama(mosque, name) : "";
+            return `
+                <article class="prayer-card${name === next ? " next" : ""}">
+                    <div class="prayer-name">${prayerLabel(name)}${name === next ? " · next" : ""}</div>
+                    <div class="prayer-time">${escapeHtml(timings[name] || "--:--")}</div>
+                    ${iqama && name !== "Sunrise" && name !== "Jumua" && name !== "Jumua2" ? `<div class="prayer-iqama">Iqama ${escapeHtml(iqama)}</div>` : ""}
+                </article>
+            `;
+        }).join("");
+    }
+
+    function mosqueCardHtml(mosque, { selected = false, compact = false } = {}) {
+        const timings = mosqueTimings(mosque);
+        const km = state.prayer.lat != null && mosque.latitude != null
+            ? haversineKm(state.prayer.lat, state.prayer.lng, mosque.latitude, mosque.longitude)
+            : null;
+        const times = prayerTimeNames(timings).map((name) => `
+            <div>
+                <span>${prayerLabel(name)}</span>
+                <strong>${escapeHtml(timings[name] || "--:--")}</strong>
+            </div>
+        `).join("");
+        return `
+            <article class="mosque-card${selected ? " active" : ""}">
+                <div class="mosque-card-top">
+                    <div>
+                        <h4>${escapeHtml(mosque.name || mosque.label || "Mosque")}</h4>
+                        <p class="mosque-meta">${escapeHtml(mosque.localisation || "")}${km != null ? ` · ${km < 10 ? km.toFixed(1) : Math.round(km)} km` : ""}</p>
+                    </div>
+                </div>
+                ${compact ? "" : `<div class="mosque-times">${times}</div>`}
+                <div class="mosque-actions">
+                    ${selected
+                        ? `<button class="btn secondary" type="button" data-action="clear-mosque">Use calculated times</button>`
+                        : `<button class="btn" type="button" data-action="select-mosque" data-uuid="${escapeHtml(mosque.uuid)}">Use this mosque</button>`}
+                    ${mosque.slug ? `<a class="btn secondary" href="https://mawaqit.net/en/${encodeURIComponent(mosque.slug)}" target="_blank" rel="noopener noreferrer">Mawaqit</a>` : ""}
+                </div>
+            </article>
+        `;
+    }
+
+    function renderMosqueList() {
+        if (!els.mosqueList) return;
+        const selectedId = state.prayer.mosque?.uuid;
+        if (state.prayer.mosque) {
+            els.selectedMosque.innerHTML = mosqueCardHtml(state.prayer.mosque, { selected: true, compact: true });
+        } else {
+            els.selectedMosque.innerHTML = "";
+        }
+        const others = state.nearbyMosques.filter((mosque) => mosque.uuid !== selectedId).slice(0, 8);
+        els.mosqueList.innerHTML = others.map((mosque) => mosqueCardHtml(mosque)).join("");
+    }
+
+    function jsonpGet(url, timeoutMs = 12000) {
+        return new Promise((resolve, reject) => {
+            const callback = `mq_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+            const script = document.createElement("script");
+            let done = false;
+            const finish = (error, data) => {
+                if (done) return;
+                done = true;
+                clearTimeout(timer);
+                delete window[callback];
+                script.remove();
+                if (error) reject(error);
+                else resolve(data);
+            };
+            const timer = setTimeout(() => finish(new Error("timeout")), timeoutMs);
+            window[callback] = (data) => finish(null, data);
+            script.onerror = () => finish(new Error("jsonp failed"));
+            script.src = url.includes("?") ? `${url}&callback=${callback}` : `${url}?callback=${callback}`;
+            document.head.appendChild(script);
+        });
+    }
+
+    async function fetchMawaqitSearch(params) {
+        const url = `${MAWAQIT}/mosque/search?${params}`;
+        const parseList = (data) => {
+            if (Array.isArray(data)) return data;
+            if (typeof data?.contents === "string") {
+                const parsed = JSON.parse(data.contents);
+                if (Array.isArray(parsed)) return parsed;
+            }
+            return null;
+        };
+        try {
+            const response = await fetch(url);
+            if (response.ok) {
+                const list = parseList(await response.json());
+                if (list) return list;
+            }
+        } catch {
+            /* CORS is expected from some browsers */
+        }
+        const proxies = [
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+            `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`
+        ];
+        for (const attempt of proxies) {
+            try {
+                const response = await fetch(attempt);
+                if (!response.ok) continue;
+                const list = parseList(await response.json());
+                if (list) return list;
+            } catch {
+                /* try next */
+            }
+        }
+        const jsonpSources = [
+            `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+            `https://jsonp.afeld.me/?url=${encodeURIComponent(url)}`
+        ];
+        for (const source of jsonpSources) {
+            try {
+                const wrapped = await jsonpGet(source);
+                const list = parseList(wrapped);
+                if (list) return list;
+            } catch {
+                /* try next */
+            }
+        }
+        throw new Error("Mawaqit search failed");
+    }
+
+    async function loadNearbyMosques({ lat, lng, word } = {}) {
+        if (!els.mosqueStatus) return;
+        els.mosqueStatus.textContent = "Loading nearby mosques from Mawaqit…";
+        try {
+            const params = word
+                ? `word=${encodeURIComponent(word)}`
+                : `lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`;
+            const list = await fetchMawaqitSearch(params);
+            state.nearbyMosques = list.filter((item) => item && item.uuid && Array.isArray(item.times));
+            if (lat != null && lng != null) {
+                state.nearbyMosques.sort((a, b) =>
+                    haversineKm(lat, lng, a.latitude, a.longitude) - haversineKm(lat, lng, b.latitude, b.longitude)
+                );
+            }
+            if (state.prayer.mosque?.uuid) {
+                const fresh = state.nearbyMosques.find((item) => item.uuid === state.prayer.mosque.uuid);
+                if (fresh) {
+                    state.prayer.mosque = slimMosque(fresh);
+                    savePrayerPrefs();
+                    renderPrayerGrid(mosqueTimings(fresh), fresh);
+                }
+            }
+            els.mosqueStatus.textContent = state.nearbyMosques.length
+                ? `${state.nearbyMosques.length} mosque${state.nearbyMosques.length === 1 ? "" : "s"} found. Times are from Mawaqit.`
+                : "No Mawaqit mosques found for that search.";
+            renderMosqueList();
+        } catch (error) {
+            console.error(error);
+            els.mosqueStatus.innerHTML = 'Could not load Mawaqit mosques from the browser. <a href="https://mawaqit.net/en" target="_blank" rel="noopener noreferrer">Open Mawaqit</a>';
+        }
+    }
+
+    function slimMosque(mosque) {
+        return {
+            uuid: mosque.uuid,
+            name: mosque.name || mosque.label,
+            slug: mosque.slug,
+            localisation: mosque.localisation,
+            latitude: mosque.latitude,
+            longitude: mosque.longitude,
+            times: mosque.times,
+            iqama: mosque.iqama,
+            jumua: mosque.jumua,
+            jumua2: mosque.jumua2
+        };
+    }
+
+    function selectMosque(uuid) {
+        const mosque = state.nearbyMosques.find((item) => item.uuid === uuid);
+        if (!mosque) return;
+        state.prayer.mosque = slimMosque(mosque);
+        savePrayerPrefs();
+        els.prayerStatus.textContent = `${mosque.name || "Mosque"} · Mawaqit`;
+        renderPrayerGrid(mosqueTimings(mosque), mosque);
+        renderMosqueList();
+        notify(`Using ${mosque.name || "this mosque"} prayer times.`);
+        schedulePrayerAlerts();
+    }
+
+    function clearMosque() {
+        state.prayer.mosque = null;
+        savePrayerPrefs();
+        if (state.prayer.timings) {
+            renderPrayerGrid(state.prayer.timings);
+            els.prayerStatus.textContent = "Calculated prayer times";
+        }
+        renderMosqueList();
+        notify("Using calculated prayer times.", "info");
+        schedulePrayerAlerts();
+    }
+
+    function playAlertChime() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const now = ctx.currentTime;
+            [0, 0.22].forEach((offset, index) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = "sine";
+                osc.frequency.value = index === 0 ? 660 : 880;
+                gain.gain.setValueAtTime(0.0001, now + offset);
+                gain.gain.exponentialRampToValueAtTime(0.12, now + offset + 0.03);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.35);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now + offset);
+                osc.stop(now + offset + 0.4);
+            });
+            setTimeout(() => ctx.close().catch(() => {}), 1200);
+        } catch {
+            /* ignore */
+        }
+    }
+
+    function showPrayerAlert(name, remainingMs, { test = false } = {}) {
+        const minutes = Math.max(0, Math.round(remainingMs / 60000));
+        const atTime = remainingMs <= 45000;
+        const title = prayerLabel(name);
+        const body = atTime
+            ? `It is time for ${title}.`
+            : `${title} is in ${minutes} minute${minutes === 1 ? "" : "s"}.`;
+        const message = test ? `This is a test. ${body}` : body;
+        if (els.prayerAlert) {
+            els.prayerAlert.hidden = false;
+            els.prayerAlertKicker.textContent = test
+                ? "Test alert"
+                : atTime ? "Prayer time" : "Upcoming prayer";
+            els.prayerAlertTitle.textContent = title;
+            els.prayerAlertBody.textContent = message;
+        }
+        playAlertChime();
+        sendPrayerNotification(`${test ? "Test · " : ""}${title} prayer`, message, name);
+    }
+
+    function sendPrayerNotification(title, body, tag) {
+        if (!("Notification" in window) || Notification.permission !== "granted") return;
+        try {
+            const note = new Notification(title, {
+                body,
+                tag: `digital-quran-${tag || "prayer"}`,
+                icon: "favicon.svg"
+            });
+            note.onclick = () => {
+                window.focus();
+                note.close();
+            };
+        } catch {
+            /* ignore */
+        }
+    }
+
+    async function testPrayerAlert() {
+        if ("Notification" in window && Notification.permission === "default") {
+            try {
+                await Notification.requestPermission();
+            } catch {
+                /* ignore */
+            }
+        }
+        const timings = currentAlertTimings();
+        let name = timings ? nextPrayer(timings) : "Maghrib";
+        if (name === "Sunrise") name = "Dhuhr";
+        const lead = Number(els.prayerAlertLead?.value ?? state.prayer.alertLead) || 0;
+        showPrayerAlert(name, lead * 60000, { test: true });
+        if (!("Notification" in window)) {
+            notify("Popup shown. This browser has no system notifications.", "info");
+        } else if (Notification.permission !== "granted") {
+            notify("Popup shown. Allow notifications to also get a system alert.", "info");
+        }
+    }
+
+    function dismissPrayerAlert() {
+        if (els.prayerAlert) els.prayerAlert.hidden = true;
+    }
+
+    function checkPrayerAlerts() {
+        if (!state.prayer.alertsEnabled) return;
+        const timings = currentAlertTimings();
+        if (!timings) return;
+        const lead = Number(state.prayer.alertLead) || 0;
+        const names = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"];
+        if (new Date().getDay() === 5 && timings.Jumua) names.push("Jumua");
+        names.forEach((name) => {
+            const when = prayerClock(timings[name]);
+            if (!when) return;
+            const remaining = when.getTime() - Date.now();
+            const leadMs = lead * 60000;
+            if (remaining < -30000 || remaining > leadMs + 25000) return;
+            const key = `${todayKey()}:${name}:${lead}`;
+            if (state.alertedPrayers.has(key)) return;
+            state.alertedPrayers.add(key);
+            showPrayerAlert(name, remaining);
+        });
+    }
+
+    function schedulePrayerAlerts() {
+        if (state.prayerTick) clearInterval(state.prayerTick);
+        if (!state.prayer.alertsEnabled) return;
+        checkPrayerAlerts();
+        state.prayerTick = setInterval(checkPrayerAlerts, 20000);
+    }
+
+    async function enablePrayerAlerts(enabled) {
+        state.prayer.alertsEnabled = enabled;
+        savePrayerPrefs();
+        if (enabled) {
+            if ("Notification" in window && Notification.permission === "default") {
+                try {
+                    await Notification.requestPermission();
+                } catch {
+                    /* ignore */
+                }
+            }
+            const granted = "Notification" in window && Notification.permission === "granted";
+            els.prayerAlertHint.textContent = granted
+                ? "Alerts will pop up here and as a system notification."
+                : "Alerts will pop up in the app. Allow notifications in the browser for a system alert too.";
+            notify("Prayer alerts on.", "info");
+            schedulePrayerAlerts();
+        } else {
+            if (state.prayerTick) clearInterval(state.prayerTick);
+            state.prayerTick = null;
+            els.prayerAlertHint.textContent = "Get a popup when the next prayer is near. Allow notifications for a system alert too.";
+            notify("Prayer alerts off.", "info");
+        }
     }
 
     async function loadPrayerTimes({ lat, lng, city, country }) {
@@ -1067,24 +1498,35 @@
             const data = await fetchJson(url);
             const timings = data.data.timings;
             const hijri = data.data.date.hijri;
-            const next = nextPrayer(timings);
-            els.prayerStatus.textContent = `${data.data.meta.timezone} · ${hijri.day} ${hijri.month.en} ${hijri.year} AH`;
-            els.prayerGrid.innerHTML = ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"].map((name) => `
-                <article class="prayer-card${name === next ? " next" : ""}">
-                    <div class="prayer-name">${prayerLabel(name)}${name === next ? " · next" : ""}</div>
-                    <div class="prayer-time">${timings[name].slice(0, 5)}</div>
-                </article>
-            `).join("");
-
-            if (lat != null && lng != null) {
-                const qibla = await fetchJson(`${ALADHAN}/qibla/${lat}/${lng}`);
-                els.qiblaInfo.textContent = `Qibla direction: ${qibla.data.direction.toFixed(1)}° from true north.`;
+            const coordsLat = lat ?? data.data.meta.latitude;
+            const coordsLng = lng ?? data.data.meta.longitude;
+            state.prayer.method = method;
+            state.prayer.city = city || state.prayer.city || "";
+            state.prayer.country = country || state.prayer.country || "";
+            state.prayer.lat = coordsLat ?? null;
+            state.prayer.lng = coordsLng ?? null;
+            state.prayer.timings = {
+                Fajr: timings.Fajr.slice(0, 5),
+                Sunrise: timings.Sunrise.slice(0, 5),
+                Dhuhr: timings.Dhuhr.slice(0, 5),
+                Asr: timings.Asr.slice(0, 5),
+                Maghrib: timings.Maghrib.slice(0, 5),
+                Isha: timings.Isha.slice(0, 5)
+            };
+            savePrayerPrefs();
+            const mosque = state.prayer.mosque;
+            if (mosque?.times) {
+                els.prayerStatus.textContent = `${mosque.name} · Mawaqit · ${hijri.day} ${hijri.month.en} ${hijri.year} AH`;
+                renderPrayerGrid(mosqueTimings(mosque), mosque);
             } else {
-                els.qiblaInfo.textContent = "";
+                els.prayerStatus.textContent = `${data.data.meta.timezone} · ${hijri.day} ${hijri.month.en} ${hijri.year} AH`;
+                renderPrayerGrid(state.prayer.timings);
             }
 
-            state.prayer = { method, city: city || "", country: country || "", lat: lat ?? null, lng: lng ?? null };
-            saveJson("quranPrayerPrefs", state.prayer);
+            if (coordsLat != null && coordsLng != null) {
+                loadNearbyMosques({ lat: coordsLat, lng: coordsLng });
+            }
+            schedulePrayerAlerts();
         } catch (error) {
             console.error(error);
             els.prayerStatus.textContent = "Could not load prayer times.";
@@ -1096,6 +1538,13 @@
         els.methodSelect.value = state.prayer.method || "3";
         els.cityInput.value = state.prayer.city || "";
         els.countryInput.value = state.prayer.country || "";
+        if (els.prayerAlertsToggle) els.prayerAlertsToggle.checked = Boolean(state.prayer.alertsEnabled);
+        if (els.prayerAlertLead) els.prayerAlertLead.value = String(state.prayer.alertLead ?? 10);
+        renderMosqueList();
+        if (state.prayer.mosque?.times) {
+            els.prayerStatus.textContent = `${state.prayer.mosque.name || "Mosque"} · Mawaqit`;
+            renderPrayerGrid(mosqueTimings(state.prayer.mosque), state.prayer.mosque);
+        }
         if (state.prayer.lat != null && state.prayer.lng != null) {
             loadPrayerTimes({ lat: state.prayer.lat, lng: state.prayer.lng });
         } else if (state.prayer.city && state.prayer.country) {
@@ -1264,6 +1713,12 @@
             renderBookmarks();
         } else if (action === "dhikr") {
             bumpDhikr(actionEl.dataset.id);
+        } else if (action === "select-mosque") {
+            selectMosque(actionEl.dataset.uuid);
+        } else if (action === "clear-mosque") {
+            clearMosque();
+        } else if (action === "dismiss-prayer-alert") {
+            dismissPrayerAlert();
         }
     }
 
@@ -1370,9 +1825,31 @@
         });
         els.methodSelect.addEventListener("change", () => {
             state.prayer.method = els.methodSelect.value;
+            savePrayerPrefs();
             if (state.prayer.lat != null) loadPrayerTimes({ lat: state.prayer.lat, lng: state.prayer.lng });
             else if (state.prayer.city) loadPrayerTimes({ city: state.prayer.city, country: state.prayer.country });
         });
+        els.mosqueSearchBtn.addEventListener("click", () => {
+            const word = els.mosqueSearchInput.value.trim();
+            if (!word) {
+                if (state.prayer.lat != null) loadNearbyMosques({ lat: state.prayer.lat, lng: state.prayer.lng });
+                else notify("Search a mosque name or city.", "info");
+                return;
+            }
+            loadNearbyMosques({ word });
+        });
+        els.mosqueSearchInput.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") els.mosqueSearchBtn.click();
+        });
+        els.prayerAlertsToggle.addEventListener("change", () => {
+            enablePrayerAlerts(els.prayerAlertsToggle.checked);
+        });
+        els.prayerAlertLead.addEventListener("change", () => {
+            state.prayer.alertLead = Number(els.prayerAlertLead.value) || 0;
+            savePrayerPrefs();
+            schedulePrayerAlerts();
+        });
+        els.testPrayerAlertBtn.addEventListener("click", () => testPrayerAlert());
         els.resetDhikrBtn.addEventListener("click", () => {
             state.dhikr = { date: todayKey(), counts: Object.fromEntries(DHIKR_ITEMS.map((item) => [item.id, 0])) };
             saveJson("quranDhikr", state.dhikr);
@@ -1382,10 +1859,14 @@
         els.appModal.addEventListener("click", (event) => {
             if (event.target === els.appModal) closeModal();
         });
+        els.prayerAlert.addEventListener("click", (event) => {
+            if (event.target === els.prayerAlert) dismissPrayerAlert();
+        });
 
         document.addEventListener("keydown", (event) => {
             if (event.key === "Escape") {
-                if (els.appModal.classList.contains("open")) closeModal();
+                if (els.prayerAlert && !els.prayerAlert.hidden) dismissPrayerAlert();
+                else if (els.appModal.classList.contains("open")) closeModal();
                 else if (state.view !== "home") showView("home");
             }
             if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "b") {
@@ -1424,6 +1905,14 @@
         updateBookmarkCount();
         renderContinue();
         setupEvents();
+        if (els.prayerAlertsToggle) els.prayerAlertsToggle.checked = Boolean(state.prayer.alertsEnabled);
+        if (els.prayerAlertLead) els.prayerAlertLead.value = String(state.prayer.alertLead ?? 10);
+        if (state.prayer.alertsEnabled) schedulePrayerAlerts();
+        if (state.prayer.lat != null && state.prayer.lng != null) {
+            loadPrayerTimes({ lat: state.prayer.lat, lng: state.prayer.lng });
+        } else if (state.prayer.city && state.prayer.country) {
+            loadPrayerTimes({ city: state.prayer.city, country: state.prayer.country });
+        }
         try {
             await Promise.all([loadSurahs(), loadDailyAyah()]);
         } catch (error) {

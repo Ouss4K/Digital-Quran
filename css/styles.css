@@ -946,8 +946,15 @@ input {
 
 .prayer-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 10px;
+    margin: 4px 0 8px;
+}
+
+.prayer-grid .prayer-card {
+    margin-bottom: 0;
+    text-align: center;
+    padding: 16px 10px;
 }
 
 .prayer-card.next {
@@ -964,6 +971,176 @@ input {
     font-size: 1.4rem;
     font-weight: 700;
     color: var(--accent-color);
+}
+
+.prayer-iqama {
+    color: var(--text-secondary);
+    font-size: 12px;
+    margin-top: 4px;
+}
+
+.prayer-alerts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin: 18px 0 8px;
+}
+
+.alert-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: var(--accent-color);
+}
+
+.alert-hint {
+    color: var(--text-secondary);
+    font-size: 13px;
+    margin: 0 0 22px;
+}
+
+.mosque-search-block h3,
+.mosque-section h3 {
+    margin: 8px 0 12px;
+    color: var(--accent-color);
+    font-size: 1.15rem;
+}
+
+.mosque-search-block {
+    margin: 8px 0 18px;
+}
+
+.mosque-status {
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.mosque-list {
+    display: grid;
+    gap: 12px;
+}
+
+.mosque-card,
+.selected-mosque {
+    background: var(--verse-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 15px;
+    padding: 16px;
+    text-align: left;
+}
+
+.mosque-card.active,
+.selected-mosque {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 1px var(--gold);
+}
+
+.mosque-card-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.mosque-card-top > div:first-child {
+    min-width: 0;
+    flex: 1;
+}
+
+.mosque-card-top .mosque-meta {
+    margin-bottom: 0;
+}
+
+.mosque-card h4,
+.selected-mosque h4 {
+    margin: 0 0 4px;
+    color: var(--accent-color);
+}
+
+.mosque-meta {
+    color: var(--text-secondary);
+    font-size: 13px;
+    margin: 0 0 10px;
+}
+
+.mosque-times {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 8px;
+    margin: 12px 0;
+}
+
+.mosque-times span {
+    display: block;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.mosque-times strong {
+    display: block;
+    font-size: 1.05rem;
+    color: var(--accent-color);
+}
+
+.mosque-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.mosque-actions .btn {
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+}
+
+.prayer-alert {
+    position: fixed;
+    inset: 0;
+    z-index: 12000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.72);
+}
+
+.prayer-alert[hidden] {
+    display: none !important;
+}
+
+.prayer-alert-card {
+    background: var(--card-bg);
+    border-radius: 20px;
+    padding: 28px 24px 22px;
+    max-width: 420px;
+    width: 100%;
+    text-align: center;
+    box-shadow: var(--shadow);
+    border: 2px solid var(--gold);
+}
+
+.prayer-alert-kicker {
+    margin: 0 0 8px;
+    color: var(--gold);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-size: 12px;
+}
+
+.prayer-alert-card h3 {
+    margin: 0 0 10px;
+    color: var(--accent-color);
+    font-size: 2rem;
+}
+
+.prayer-alert-card p {
+    color: var(--text-secondary);
+    margin: 0 0 18px;
 }
 
 .location-row,
@@ -985,9 +1162,10 @@ input {
     font-size: 16px;
 }
 
-.qibla {
-    margin-top: 16px;
-    color: var(--text-secondary);
+#prayerStatus {
+    font-weight: 600;
+    color: var(--accent-color);
+    margin: 0 0 12px;
 }
 
 .dhikr-grid {
@@ -1149,6 +1327,13 @@ input {
     border: 0;
 }
 
+@media (max-width: 900px) {
+    .prayer-grid,
+    .mosque-times {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
 @media (max-width: 800px) {
     .home-panels {
         grid-template-columns: 1fr;
@@ -1173,6 +1358,11 @@ input {
     .surah-reading,
     .page-card {
         padding: 16px;
+    }
+
+    .prayer-grid,
+    .mosque-times {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
