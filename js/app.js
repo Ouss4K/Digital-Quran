@@ -6,27 +6,46 @@
     const AUDIO_AYAH = "https://cdn.islamic.network/quran/audio/128/ar.alafasy";
     const ALADHAN = "https://api.aladhan.com/v1";
     const TAFSIR_API = "https://api.quran.com/api/v4";
+    const TAFSIR_CDN = "https://cdn.jsdelivr.net/gh/spa5k/tafsir_api@main/tafsir";
     const MAWAQIT = "https://mawaqit.net/api/2.0";
 
     const TAFSIRS = {
-        169: { name: "Ibn Kathir (English, abridged)", rtl: false },
-        168: { name: "Ma'arif al-Qur'an (English)", rtl: false },
-        16: { name: "Al-Muyassar (Arabic)", rtl: true },
-        91: { name: "Al-Sa'di (Arabic)", rtl: true }
+        "en-ibn-kathir": { name: "Ibn Kathir (abridged)", lang: "en", quranId: 169 },
+        "en-maarif": { name: "Ma'arif al-Qur'an", lang: "en", quranId: 168 },
+        "ar-muyassar": { name: "Al-Muyassar", lang: "ar", rtl: true, quranId: 16 },
+        "ar-sadi": { name: "Al-Sa'di", lang: "ar", rtl: true, quranId: 91 },
+        "fr-mukhtasar": { name: "Al-Mukhtasar", lang: "fr", slug: "french-mokhtasar" },
+        "es-mukhtasar": { name: "Al-Mukhtasar", lang: "es", slug: "spanish-mokhtasar" },
+        "tr-mukhtasar": { name: "Al-Mukhtasar", lang: "tr", slug: "turkish-mokhtasar" },
+        "tr-ibn-kathir": { name: "Ibn Kathir", lang: "tr", slug: "tr-tafsir-ibne-kathir" },
+        "ur-ibn-kathir": { name: "Ibn Kathir", lang: "ur", rtl: true, quranId: 160 },
+        "ur-tazkir": { name: "Tazkirul Quran", lang: "ur", rtl: true, quranId: 818 },
+        "id-mukhtasar": { name: "Al-Mukhtasar", lang: "id", slug: "indonesian-mokhtasar" },
+        "id-jalalayn": { name: "Jalalayn", lang: "id", slug: "in-tafsir-jalalayn" },
+        "ru-sadi": { name: "Al-Sa'di", lang: "ru", quranId: 170 },
+        "zh-mukhtasar": { name: "Al-Mukhtasar", lang: "zh", slug: "chinese-mokhtasar" },
+        "hi-mukhtasar": { name: "Al-Mukhtasar", lang: "hi", slug: "hindi-mokhtasar" }
+    };
+
+    const LEGACY_TAFSIR = {
+        169: "en-ibn-kathir",
+        168: "en-maarif",
+        16: "ar-muyassar",
+        91: "ar-sadi"
     };
 
     const LANGUAGES = {
-        "ar": { name: "العربية", short: "العربية", rtl: true, arabicOnly: true },
-        "en.sahih": { name: "English (Sahih International)", short: "English" },
-        "fr.hamidullah": { name: "Français (Hamidullah)", short: "Français" },
-        "es.cortes": { name: "Español (Julio Cortés)", short: "Español" },
-        "de.bubenheim": { name: "Deutsch (Bubenheim)", short: "Deutsch" },
-        "tr.diyanet": { name: "Türkçe (Diyanet)", short: "Türkçe" },
-        "ur.junagarhi": { name: "اردو (Junagarhi)", short: "اردو" },
-        "id.indonesian": { name: "Bahasa Indonesia", short: "Indonesia" },
-        "ru.kuliev": { name: "Русский (Kuliev)", short: "Русский" },
-        "zh.jian": { name: "中文 (Simplified)", short: "中文" },
-        "hi.hindi": { name: "हिंदी (Hindi)", short: "हिंदी" }
+        "ar": { name: "العربية", short: "العربية", rtl: true, arabicOnly: true, tafsirLang: "ar" },
+        "en.sahih": { name: "English (Sahih International)", short: "English", tafsirLang: "en" },
+        "fr.hamidullah": { name: "Français (Hamidullah)", short: "Français", tafsirLang: "fr" },
+        "es.cortes": { name: "Español (Julio Cortés)", short: "Español", tafsirLang: "es" },
+        "de.bubenheim": { name: "Deutsch (Bubenheim)", short: "Deutsch", tafsirLang: "en" },
+        "tr.diyanet": { name: "Türkçe (Diyanet)", short: "Türkçe", tafsirLang: "tr" },
+        "ur.junagarhi": { name: "اردو (Junagarhi)", short: "اردو", tafsirLang: "ur" },
+        "id.indonesian": { name: "Bahasa Indonesia", short: "Indonesia", tafsirLang: "id" },
+        "ru.kuliev": { name: "Русский (Kuliev)", short: "Русский", tafsirLang: "ru" },
+        "zh.jian": { name: "中文 (Simplified)", short: "中文", tafsirLang: "zh" },
+        "hi.hindi": { name: "हिंदी (Hindi)", short: "हिंदी", tafsirLang: "hi" }
     };
 
     const CATEGORIES = {
@@ -80,7 +99,8 @@
         lastRead: loadJson("quranLastRead", null),
         listScroll: Number(sessionStorage.getItem("quranListScroll") || 0),
         fontScale: Number(localStorage.getItem("quranFontScale") || 1),
-        tafsirId: Number(localStorage.getItem("quranTafsir") || 169),
+        tafsirId: localStorage.getItem("quranTafsir") || "en-ibn-kathir",
+        tafsirByLang: loadJson("quranTafsirByLang", {}),
         tafsirCache: new Map(),
         prayer: loadJson("quranPrayerPrefs", {
             method: "3",
@@ -669,10 +689,38 @@
         }
     }
 
+    function tafsirLangCode() {
+        return LANGUAGES[state.language]?.tafsirLang || "en";
+    }
+
+    function tafsirEntries() {
+        const lang = tafsirLangCode();
+        return Object.entries(TAFSIRS).filter(([, item]) => item.lang === lang);
+    }
+
+    function resolveTafsirId(preferred) {
+        const legacy = LEGACY_TAFSIR[preferred] || LEGACY_TAFSIR[Number(preferred)];
+        const candidate = legacy || preferred;
+        const lang = tafsirLangCode();
+        if (candidate && TAFSIRS[candidate]?.lang === lang) return candidate;
+        return tafsirEntries()[0]?.[0] || "en-ibn-kathir";
+    }
+
+    function applyTafsirForLanguage({ persist = true } = {}) {
+        const preferred = state.tafsirByLang[tafsirLangCode()] || state.tafsirId;
+        const nextId = resolveTafsirId(preferred);
+        state.tafsirId = nextId;
+        if (persist) {
+            localStorage.setItem("quranTafsir", nextId);
+            state.tafsirByLang[tafsirLangCode()] = nextId;
+            saveJson("quranTafsirByLang", state.tafsirByLang);
+        }
+    }
+
     function tafsirOptions() {
-        if (!TAFSIRS[state.tafsirId]) state.tafsirId = 169;
-        return Object.entries(TAFSIRS).map(([id, tafsir]) =>
-            `<option value="${id}" ${Number(id) === Number(state.tafsirId) ? "selected" : ""}>${escapeHtml(tafsir.name)}</option>`
+        applyTafsirForLanguage({ persist: false });
+        return tafsirEntries().map(([id, tafsir]) =>
+            `<option value="${escapeHtml(id)}" ${id === state.tafsirId ? "selected" : ""}>${escapeHtml(tafsir.name)}</option>`
         ).join("");
     }
 
@@ -704,10 +752,8 @@
         const body = document.createElement("div");
         body.className = "tafsir-body";
         const sourceInfo = TAFSIRS[state.tafsirId];
-        if (sourceInfo?.rtl) {
-            body.lang = "ar";
-            body.dir = "rtl";
-        }
+        if (sourceInfo?.lang) body.lang = sourceInfo.lang;
+        if (sourceInfo?.rtl) body.dir = "rtl";
         text.split(/\n{2,}/).forEach((paragraph) => {
             const p = document.createElement("p");
             p.textContent = paragraph.trim();
@@ -747,19 +793,29 @@
 
         renderTafsirPanel(panel, { loading: true });
         try {
-            const data = await fetchJson(`${TAFSIR_API}/tafsirs/${state.tafsirId}/by_ayah/${verseKey}`);
-            const text = tafsirPlainText(data.tafsir?.text);
-            if (!text) throw new Error("empty");
-            const payload = {
-                text,
-                source: data.tafsir?.resource_name || TAFSIRS[state.tafsirId].name
-            };
+            const payload = await loadTafsirPayload(verseKey);
             state.tafsirCache.set(cacheKey, payload);
             renderTafsirPanel(panel, payload);
         } catch (error) {
             console.error(error);
             renderTafsirPanel(panel, { error: "Could not load tafsir for this verse." });
         }
+    }
+
+    async function loadTafsirPayload(verseKey) {
+        const tafsir = TAFSIRS[state.tafsirId];
+        if (!tafsir) throw new Error("missing tafsir");
+        if (tafsir.quranId) {
+            const data = await fetchJson(`${TAFSIR_API}/tafsirs/${tafsir.quranId}/by_ayah/${verseKey}`);
+            const text = tafsirPlainText(data.tafsir?.text);
+            if (!text) throw new Error("empty");
+            return { text, source: data.tafsir?.resource_name || tafsir.name };
+        }
+        const [surah, ayah] = String(verseKey).split(":");
+        const data = await fetchJson(`${TAFSIR_CDN}/${encodeURIComponent(tafsir.slug)}/${Number(surah)}/${Number(ayah)}.json`);
+        const text = tafsirPlainText(data.text);
+        if (!text) throw new Error("empty");
+        return { text, source: tafsir.name };
     }
 
     async function readSurah(number, scrollToVerse) {
@@ -1732,10 +1788,12 @@
             }
         }
         if (event.target.dataset.action === "tafsir-source") {
-            const nextId = Number(event.target.value);
+            const nextId = event.target.value;
             if (!TAFSIRS[nextId]) return;
             state.tafsirId = nextId;
-            localStorage.setItem("quranTafsir", String(nextId));
+            state.tafsirByLang[tafsirLangCode()] = nextId;
+            localStorage.setItem("quranTafsir", nextId);
+            saveJson("quranTafsirByLang", state.tafsirByLang);
             document.querySelectorAll(".tafsir-panel").forEach((panel) => {
                 panel.hidden = true;
                 panel.replaceChildren();
@@ -1782,8 +1840,12 @@
             state.language = els.languageSelector.value;
             localStorage.setItem("quranLanguage", state.language);
             applyFontScale();
+            applyTafsirForLanguage();
             const lang = LANGUAGES[state.language];
-            notify(lang.arabicOnly ? `Language: ${lang.name}` : `Translation: ${lang.name}`, "info");
+            const tafsir = TAFSIRS[state.tafsirId];
+            notify(tafsir
+                ? `${lang.arabicOnly ? lang.name : lang.short} · ${tafsir.name}`
+                : (lang.arabicOnly ? `Language: ${lang.name}` : `Translation: ${lang.name}`), "info");
             loadDailyAyah();
             if (state.view === "reading" && state.currentSurah) readSurah(state.currentSurah, state.currentVerse);
         });
@@ -1900,6 +1962,7 @@
     async function init() {
         cacheEls();
         fillLanguages();
+        applyTafsirForLanguage();
         setTheme(state.theme);
         applyFontScale();
         updateBookmarkCount();
