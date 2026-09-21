@@ -2,7 +2,7 @@
 
 A calm, modern Quran companion for reading, listening, bookmarking, prayer times, and dhikr — all in the browser.
 
-**Live:** [ouss4k.github.io/Digital-Quran](https://github.com/Ouss4K/Digital-Quran)
+
 
 ## Features
 
@@ -13,7 +13,7 @@ A calm, modern Quran companion for reading, listening, bookmarking, prayer times
 - Continue reading from your last verse
 - Ayah of the day
 - Islamic calendar with upcoming Hijri dates
-- Prayer times by GPS or city, plus qibla direction
+- Prayer times by GPS or city
 - Daily dhikr counter
 - Dark mode, font size controls, keyboard shortcuts
 - Works as a lightweight PWA (installable, app shell cached)
